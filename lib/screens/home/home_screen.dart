@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dashboard_screen.dart';
 import '../weather/weather_screen.dart';
 import '../profile/profile_screen.dart';
+import '../expense/expense_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,6 +17,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final pages = const [
     DashboardScreen(),
     WeatherScreen(),
+    ExpenseScreen(),
     ProfileScreen(),
   ];
 
@@ -36,6 +38,8 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Icon(Icons.dashboard), label: "Home"),
           BottomNavigationBarItem(
               icon: Icon(Icons.cloud), label: "Weather"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.calculate), label: "Expense"),
           BottomNavigationBarItem(
               icon: Icon(Icons.person), label: "Profile"),
         ],
