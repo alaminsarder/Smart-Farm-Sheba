@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "545150671667",
+    "project_id": "smart-farm-sheba",
+    "storage_bucket": "smart-farm-sheba.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:545150671667:android:85b5ba936239198a097c46",
+        "android_client_info": {
+          "package_name": "com.example.smart_farm_sheba"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "545150671667-3jmc88cmlclagn28l7861qpdr1u1rj6v.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCFLvPIC3kCXoxky-kbLsDRxUcw4WKKrWY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "545150671667-3jmc88cmlclagn28l7861qpdr1u1rj6v.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
