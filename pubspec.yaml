@@ -1,5 +1,5 @@
 name: smart_farm_sheba
-description: Smart Farm Sheba App
+description: Smart Farm Sheba - Full Stack Agriculture Android App
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -12,8 +12,27 @@ dependencies:
     sdk: flutter
 
   cupertino_icons: ^1.0.8
+
+  # ✅ State Management
   provider: ^6.1.2
-  intl: ^0.19.0   # ✅ এইটা যোগ করো
+
+  # ✅ Firebase Services
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
+  cloud_firestore: ^5.4.4
+  firebase_storage: ^12.3.2
+
+  # ✅ Google Sign-In
+  google_sign_in: ^6.2.1
+
+  # ✅ Date & Time
+  intl: ^0.19.0
+
+  # ✅ HTTP (for AI Chatbot API)
+  http: ^1.2.2
+
+  # ✅ Auto login remember
+  shared_preferences: ^2.3.2
 
 dev_dependencies:
   flutter_test:
@@ -23,3 +42,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/images/
