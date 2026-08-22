@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import 'dashboard_screen.dart';
-import '../weather/weather_screen.dart';
-import '../profile/profile_screen.dart';
-import '../expense/expense_screen.dart';
+import 'package:smart_farm_sheba/features/dashboard/presentation/dashboard_screen.dart';
+import 'package:smart_farm_sheba/features/weather/presentation/weather_screen.dart';
+import 'package:smart_farm_sheba/features/expense/presentation/expense_screen.dart';
+import 'package:smart_farm_sheba/features/profile/presentation/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,14 +15,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  // Keeps scroll position / state for pages that use PageStorageKey
   final PageStorageBucket _bucket = PageStorageBucket();
 
-  late final List<Widget> _pages = const [
-    DashboardScreen(),
-    WeatherScreen(),
-    ExpenseScreen(),
-    ProfileScreen(),
+  late final List<Widget> _pages = [
+    const DashboardScreen(),
+    WeatherScreen(), // const না থাকলে safe
+    ExpenseScreen(), // const না থাকলে safe
+    ProfileScreen(), // const না থাকলে safe
   ];
 
   void _onDestinationSelected(int index) {
@@ -37,7 +36,10 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       body: PageStorage(
         bucket: _bucket,
-        child: IndexedStack(index: _selectedIndex, children: _pages),
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: _pages,
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,

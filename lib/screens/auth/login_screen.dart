@@ -1,9 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../../services/google_auth_service.dart';
-import '../home/home_screen.dart';
-import 'register_screen.dart';
+// ✅ absolute imports used to prevent path breaking
+import 'package:smart_farm_sheba/services/google_auth_service.dart';
+import 'package:smart_farm_sheba/features/home/presentation/home_screen.dart';
+import 'package:smart_farm_sheba/screens/auth/register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -112,7 +113,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     final busy = _loadingEmail || _loadingGoogle;
 
     return Scaffold(
@@ -199,8 +199,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           validator: (v) {
                             final s = (v ?? '').trim();
                             if (s.isEmpty) return "Email required";
-                            if (!_emailRegex.hasMatch(s))
+                            if (!_emailRegex.hasMatch(s)) {
                               return "Enter a valid email";
+                            }
                             return null;
                           },
                         ),

@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../home/home_screen.dart';
+
+import 'package:smart_farm_sheba/features/home/presentation/home_screen.dart';
 import 'login_screen.dart';
 
 class AuthWrapper extends StatelessWidget {
@@ -17,11 +18,17 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        if (snapshot.hasData) {
-          return const HomeScreen(); // ✅ Already logged in
+        if (snapshot.hasError) {
+          return Scaffold(
+            body: Center(child: Text("Auth error: ${snapshot.error}")),
+          );
         }
 
-        return const LoginScreen(); // ❌ Not logged in
+        if (snapshot.hasData) {
+          return const HomeScreen();
+        }
+
+        return const LoginScreen();
       },
     );
   }
