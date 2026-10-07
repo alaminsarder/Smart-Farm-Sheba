@@ -25,8 +25,13 @@ class ProfileScreen extends StatelessWidget {
   String _initials(String nameOrEmail) {
     final s = nameOrEmail.trim();
     if (s.isEmpty) return "F";
+
     final parts = s.split(RegExp(r"\s+"));
-    if (parts.length == 1) return parts.first[0].toUpperCase();
+
+    if (parts.length == 1) {
+      return parts.first[0].toUpperCase();
+    }
+
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
 
@@ -38,12 +43,17 @@ class ProfileScreen extends StatelessWidget {
   }) async {
     final formKey = GlobalKey<FormState>();
 
-    final nameC =
-        TextEditingController(text: (data['name'] ?? '') as String? ?? '');
-    final phoneC =
-        TextEditingController(text: (data['phone'] ?? '') as String? ?? '');
-    final zilaC =
-        TextEditingController(text: (data['zila'] ?? '') as String? ?? '');
+    final nameC = TextEditingController(
+      text: (data['name'] ?? '') as String? ?? '',
+    );
+
+    final phoneC = TextEditingController(
+      text: (data['phone'] ?? '') as String? ?? '',
+    );
+
+    final zilaC = TextEditingController(
+      text: (data['zila'] ?? '') as String? ?? '',
+    );
 
     bool saving = false;
 
@@ -53,7 +63,9 @@ class ProfileScreen extends StatelessWidget {
       showDragHandle: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(22),
+        ),
       ),
       builder: (ctx) {
         return StatefulBuilder(
@@ -62,27 +74,37 @@ class ProfileScreen extends StatelessWidget {
               if (!formKey.currentState!.validate()) return;
 
               setSheetState(() => saving = true);
+
               try {
-                await _userDoc(uid).set({
-                  'uid': uid,
-                  'name': nameC.text.trim(),
-                  'phone': phoneC.text.trim(),
-                  'zila': zilaC.text.trim(),
-                  'email': email,
-                  'updatedAt': FieldValue.serverTimestamp(),
-                }, SetOptions(merge: true));
+                await _userDoc(uid).set(
+                  {
+                    'uid': uid,
+                    'name': nameC.text.trim(),
+                    'phone': phoneC.text.trim(),
+                    'zila': zilaC.text.trim(),
+                    'email': email,
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  },
+                  SetOptions(merge: true),
+                );
 
                 if (ctx.mounted) Navigator.pop(ctx);
+
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Profile updated")),
+                    const SnackBar(
+                      content: Text("Profile updated"),
+                    ),
                   );
                 }
               } catch (e) {
                 setSheetState(() => saving = false);
+
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Update failed: $e")),
+                    SnackBar(
+                      content: Text("Update failed: $e"),
+                    ),
                   );
                 }
               }
@@ -103,8 +125,10 @@ class ProfileScreen extends StatelessWidget {
                   children: [
                     const Text(
                       "Edit Profile",
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -159,11 +183,14 @@ class ProfileScreen extends StatelessWidget {
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.save_rounded),
-                        label: Text(saving ? "Saving..." : "Save Changes"),
+                        label: Text(
+                          saving ? "Saving..." : "Save Changes",
+                        ),
                       ),
                     ),
                   ],
@@ -193,6 +220,7 @@ class ProfileScreen extends StatelessWidget {
       stream: _userDoc(uid).snapshots(),
       builder: (context, snapshot) {
         final data = snapshot.data?.data() ?? {};
+
         final name = (data['name'] ?? '') as String? ?? '';
         final phone = (data['phone'] ?? '') as String? ?? '';
         final zila = (data['zila'] ?? '') as String? ?? '';
@@ -200,6 +228,7 @@ class ProfileScreen extends StatelessWidget {
 
         final title =
             name.isNotEmpty ? name : (email.isNotEmpty ? email : "Farmer");
+
         final initials = _initials(title);
 
         return Scaffold(
@@ -212,6 +241,13 @@ class ProfileScreen extends StatelessWidget {
                 backgroundColor: const Color(0xFFF5F7FA),
                 expandedHeight: 220,
                 automaticallyImplyLeading: false,
+                leading: IconButton(
+                  tooltip: "Back",
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                ),
                 actions: [
                   IconButton(
                     tooltip: "Edit",
@@ -235,7 +271,10 @@ class ProfileScreen extends StatelessWidget {
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [Color(0xFF1B5E20), Color(0xFF43A047)],
+                        colors: [
+                          Color(0xFF1B5E20),
+                          Color(0xFF43A047),
+                        ],
                       ),
                       borderRadius: BorderRadius.only(
                         bottomLeft: Radius.circular(28),
@@ -244,7 +283,12 @@ class ProfileScreen extends StatelessWidget {
                     ),
                     child: SafeArea(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                        padding: const EdgeInsets.fromLTRB(
+                          18,
+                          18,
+                          18,
+                          18,
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -307,8 +351,11 @@ class ProfileScreen extends StatelessWidget {
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.verified_user_rounded,
-                                      color: Colors.white, size: 18),
+                                  const Icon(
+                                    Icons.verified_user_rounded,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
@@ -413,7 +460,9 @@ class _InfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
@@ -425,7 +474,10 @@ class _InfoCard extends StatelessWidget {
                 color: const Color(0xFFE8F5E9),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, color: Colors.green),
+              child: Icon(
+                icon,
+                color: Colors.green,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
