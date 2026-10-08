@@ -1,33 +1,49 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class GoogleAuthService {
+  static final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  /// Returns Firebase [User] if success, otherwise null (cancelled)
   static Future<User?> signInWithGoogle() async {
-    try {
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+    // ✅ WEB: popup + force account chooser
+    if (kIsWeb) {
+      final provider = GoogleAuthProvider()
+        ..addScope('email')
+        ..setCustomParameters({'prompt': 'select_account'});
 
-      if (googleUser == null) return null;
-
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final userCredential =
-          await FirebaseAuth.instance.signInWithCredential(credential);
-
-      return userCredential.user;
-    } catch (e) {
-      print("Google Sign-In Error: $e");
-      return null;
+      final cred = await _auth.signInWithPopup(provider);
+      return cred.user;
     }
+
+    // ✅ ANDROID/iOS: account chooser
+    final googleSignIn = GoogleSignIn(
+      scopes: const ['email'],
+    );
+
+    // ✅ Force chooser every time (optional but useful)
+    // If you don't want to force chooser, remove this line.
+    await googleSignIn.signOut();
+
+    final googleUser = await googleSignIn.signIn();
+    if (googleUser == null) return null; // cancelled
+
+    final googleAuth = await googleUser.authentication;
+
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    final userCred = await _auth.signInWithCredential(credential);
+    return userCred.user;
   }
 
   static Future<void> signOut() async {
-    await GoogleSignIn().signOut();
-    await FirebaseAuth.instance.signOut();
+    if (!kIsWeb) {
+      await GoogleSignIn().signOut();
+    }
+    await _auth.signOut();
   }
 }

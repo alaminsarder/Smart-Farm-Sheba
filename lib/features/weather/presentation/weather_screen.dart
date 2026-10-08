@@ -25,10 +25,15 @@ class _WeatherScreenState extends State<WeatherScreen> {
     final apiKey = dotenv.env['OPENWEATHER_API_KEY'] ?? '';
     _service = OpenWeatherService(apiKey: apiKey);
 
-    final defaultCity = dotenv.env['DEFAULT_CITY'] ?? 'Dhaka';
+    // ✅ Dhaka fallback বাদ — DEFAULT_CITY থাকলে সেটাই, না থাকলে খালি
+    final defaultCity = (dotenv.env['DEFAULT_CITY'] ?? '').trim();
     _cityCtrl = TextEditingController(text: defaultCity);
 
-    _future = _service.fetchByCity(_cityCtrl.text);
+    if (defaultCity.isNotEmpty) {
+      _future = _service.fetchByCity(defaultCity);
+    } else {
+      _future = null;
+    }
   }
 
   @override
@@ -39,6 +44,12 @@ class _WeatherScreenState extends State<WeatherScreen> {
 
   void _search() {
     final city = _cityCtrl.text.trim();
+    if (city.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a city name")),
+      );
+      return;
+    }
     setState(() => _future = _service.fetchByCity(city));
   }
 
@@ -47,9 +58,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
     final apiKey = dotenv.env['OPENWEATHER_API_KEY'] ?? '';
     if (apiKey.trim().isEmpty) {
       return const Scaffold(
-        body: Center(
-          child: Text("OPENWEATHER_API_KEY missing in .env"),
-        ),
+        body: Center(child: Text("OPENWEATHER_API_KEY missing in .env")),
       );
     }
 
@@ -64,31 +73,48 @@ class _WeatherScreenState extends State<WeatherScreen> {
         children: [
           _searchBar(),
           const SizedBox(height: 14),
-          FutureBuilder<WeatherBundle>(
-            future: _future,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const _LoadingCard();
-              }
-              if (snapshot.hasError) {
-                return _ErrorCard(
-                  message: snapshot.error.toString(),
-                  onRetry: _search,
-                );
-              }
 
-              final data = snapshot.data!;
-              return Column(
-                children: [
-                  _currentWeatherCard(context, data.current),
-                  const SizedBox(height: 14),
-                  _rainAlertCard(context, data),
-                  const SizedBox(height: 14),
-                  _forecastCard(context, data),
-                ],
-              );
-            },
-          ),
+          // ✅ শুরুতে কিছু লোড না থাকলে নির্দেশনা দেখাবে
+          if (_future == null)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .primaryContainer
+                    .withOpacity(0.25),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Text(
+                "Type a city name and press search.",
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            )
+          else
+            FutureBuilder<WeatherBundle>(
+              future: _future,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const _LoadingCard();
+                }
+                if (snapshot.hasError) {
+                  return _ErrorCard(
+                    message: snapshot.error.toString(),
+                    onRetry: _search,
+                  );
+                }
+                final data = snapshot.data!;
+                return Column(
+                  children: [
+                    _currentWeatherCard(context, data.current),
+                    const SizedBox(height: 14),
+                    _rainAlertCard(context, data),
+                    const SizedBox(height: 14),
+                    _forecastCard(context, data), // ✅ overflow fixed here
+                  ],
+                );
+              },
+            ),
         ],
       ),
     );
@@ -148,9 +174,10 @@ class _WeatherScreenState extends State<WeatherScreen> {
                 Text(
                   w.cityName,
                   style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold),
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -161,9 +188,10 @@ class _WeatherScreenState extends State<WeatherScreen> {
                 Text(
                   "${w.temp.toStringAsFixed(1)}°C",
                   style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 34,
-                      fontWeight: FontWeight.bold),
+                    color: Colors.white,
+                    fontSize: 34,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -205,15 +233,19 @@ class _WeatherScreenState extends State<WeatherScreen> {
       children: [
         Icon(icon, size: 16, color: Colors.white),
         const SizedBox(width: 6),
-        Text(value,
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w600)),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     );
   }
 
+  // ✅ OVERFLOW FIXED: height increased + compact content + FittedBox
   Widget _forecastCard(BuildContext context, WeatherBundle data) {
     final items = data.forecast.take(8).toList(); // ~24 hours
     final tz = data.current.timezone;
@@ -227,11 +259,13 @@ class _WeatherScreenState extends State<WeatherScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Next 24 Hours Forecast",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const Text(
+            "Next 24 Hours Forecast",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 110,
+            height: 128, // ✅ 110 -> 128 (overflow আর হবে না)
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: items.length,
@@ -243,30 +277,51 @@ class _WeatherScreenState extends State<WeatherScreen> {
                 final iconUrl =
                     "https://openweathermap.org/img/wn/${f.icon}@2x.png";
 
-                return Container(
+                return SizedBox(
                   width: 96,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.65),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                        color:
-                            Theme.of(context).dividerColor.withOpacity(0.35)),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(timeStr,
-                          style: const TextStyle(fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 6),
-                      Image.network(iconUrl, width: 42, height: 42,
-                          errorBuilder: (_, __, ___) {
-                        return const Icon(Icons.cloud_rounded);
-                      }),
-                      const SizedBox(height: 6),
-                      Text("${f.temp.toStringAsFixed(0)}°C",
-                          style: const TextStyle(fontWeight: FontWeight.w700)),
-                    ],
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.65),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Theme.of(context).dividerColor.withOpacity(0.35),
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FittedBox(
+                          child: Text(
+                            timeStr,
+                            maxLines: 1,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w800, fontSize: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: Image.network(
+                            iconUrl,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) =>
+                                const Icon(Icons.cloud_rounded),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        FittedBox(
+                          child: Text(
+                            "${f.temp.toStringAsFixed(0)}°C",
+                            maxLines: 1,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w800, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -312,8 +367,9 @@ class _WeatherScreenState extends State<WeatherScreen> {
           Icon(Icons.warning_amber_rounded, color: Colors.orange),
           SizedBox(width: 10),
           Expanded(
-              child: Text(
-                  "Rain alert: plan irrigation & pesticide spraying carefully.")),
+            child: Text(
+                "Rain alert: plan irrigation & pesticide spraying carefully."),
+          ),
         ],
       ),
     );

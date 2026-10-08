@@ -50,56 +50,56 @@ class DashboardScreen extends StatelessWidget {
             ? 3
             : 2;
 
+    // ✅ ORDER FIXED ONLY (same UI)
     final items = <_DashboardItem>[
-      _DashboardItem(
-        title: "Weather",
-        subtitle: "Forecast & rain alert",
-        icon: Icons.cloud_rounded,
-        gradient: const [Color(0xFF00B4DB), Color(0xFF0083B0)],
-        onTap: () => _navigate(context, WeatherScreen()), // ✅ const removed
-      ),
       _DashboardItem(
         title: "Expense",
         subtitle: "Track daily cost",
         icon: Icons.calculate_rounded,
         gradient: const [Color(0xFF11998E), Color(0xFF38EF7D)],
-        onTap: () => _navigate(context, ExpenseScreen()), // ✅ const removed
+        onTap: () => _navigate(context, ExpenseScreen()),
       ),
       _DashboardItem(
         title: "Irrigation",
         subtitle: "Schedule & control",
         icon: Icons.water_drop_rounded,
         gradient: const [Color(0xFF1D976C), Color(0xFF93F9B9)],
-        onTap: () => _navigate(context, IrrigationScreen()), // ✅ const removed
-      ),
-      _DashboardItem(
-        title: "Pesticide",
-        subtitle: "Dose & safety tips",
-        icon: Icons.pest_control_rounded,
-        gradient: const [Color(0xFFFF512F), Color(0xFFF09819)],
-        onTap: () => _navigate(context, PesticideScreen()), // ✅ const removed
+        onTap: () => _navigate(context, IrrigationScreen()),
       ),
       _DashboardItem(
         title: "Crop Suggestion",
         subtitle: "Best crop for season",
         icon: Icons.grass_rounded,
         gradient: const [Color(0xFF56AB2F), Color(0xFFA8E063)],
-        onTap: () =>
-            _navigate(context, CropSuggestionScreen()), // ✅ const removed
-      ),
-      _DashboardItem(
-        title: "Tips",
-        subtitle: "Smart farming guide",
-        icon: Icons.lightbulb_rounded,
-        gradient: const [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
-        onTap: () => _navigate(context, TipsScreen()), // ✅ const removed
+        onTap: () => _navigate(context, CropSuggestionScreen()),
       ),
       _DashboardItem(
         title: "Notes",
         subtitle: "Farm logbook",
         icon: Icons.note_alt_rounded,
         gradient: const [Color(0xFF232526), Color(0xFF414345)],
-        onTap: () => _navigate(context, NotesScreen()), // ✅ const removed
+        onTap: () => _navigate(context, NotesScreen()),
+      ),
+      _DashboardItem(
+        title: "Tips",
+        subtitle: "Smart farming guide",
+        icon: Icons.lightbulb_rounded,
+        gradient: const [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
+        onTap: () => _navigate(context, TipsScreen()),
+      ),
+      _DashboardItem(
+        title: "Weather",
+        subtitle: "Forecast & rain alert",
+        icon: Icons.cloud_rounded,
+        gradient: const [Color(0xFF00B4DB), Color(0xFF0083B0)],
+        onTap: () => _navigate(context, WeatherScreen()),
+      ),
+      _DashboardItem(
+        title: "Pesticide",
+        subtitle: "Dose & safety tips",
+        icon: Icons.pest_control_rounded,
+        gradient: const [Color(0xFFFF512F), Color(0xFFF09819)],
+        onTap: () => _navigate(context, PesticideScreen()),
       ),
     ];
 
@@ -158,8 +158,7 @@ class DashboardScreen extends StatelessWidget {
                         ),
                       ),
                       InkWell(
-                        onTap: () => _navigate(
-                            context, ProfileScreen()), // ✅ const removed
+                        onTap: () => _navigate(context, ProfileScreen()),
                         borderRadius: BorderRadius.circular(999),
                         child: Container(
                           padding: const EdgeInsets.all(2.5),
@@ -194,8 +193,7 @@ class DashboardScreen extends StatelessWidget {
                     children: [
                       InkWell(
                         borderRadius: BorderRadius.circular(999),
-                        onTap: () => _navigate(
-                            context, IrrigationScreen()), // ✅ const removed
+                        onTap: () => _navigate(context, IrrigationScreen()),
                         child: const _QuickChip(
                           icon: Icons.water_drop_rounded,
                           label: "Irrigation",
@@ -204,8 +202,7 @@ class DashboardScreen extends StatelessWidget {
                       const SizedBox(width: 10),
                       InkWell(
                         borderRadius: BorderRadius.circular(999),
-                        onTap: () => _navigate(
-                            context, PesticideScreen()), // ✅ const removed
+                        onTap: () => _navigate(context, PesticideScreen()),
                         child: const _QuickChip(
                           icon: Icons.pest_control_rounded,
                           label: "Pesticide",
