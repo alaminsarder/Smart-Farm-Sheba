@@ -6,6 +6,9 @@ import 'package:smart_farm_sheba/services/google_auth_service.dart';
 import 'package:smart_farm_sheba/features/home/presentation/home_screen.dart';
 import 'package:smart_farm_sheba/screens/auth/register_screen.dart';
 
+// ✅ ADD THIS
+import 'package:smart_farm_sheba/screens/auth/phone_login_screen.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -442,8 +445,15 @@ class _LoginScreenState extends State<LoginScreen> {
                               child: OutlinedButton.icon(
                                 onPressed: busy
                                     ? null
-                                    : () => _snack(
-                                        "ডেভেলপার এখন ব্যস্ত আছে, পরে অ্যাড করবে।"),
+                                    : () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const PhoneLoginScreen(),
+                                          ),
+                                        );
+                                      },
                                 icon: const Icon(Icons.phone_rounded,
                                     color: Color(0xFF2E7D32)),
                                 label: const Text(
