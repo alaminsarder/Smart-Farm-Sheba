@@ -222,6 +222,8 @@ The project will continue to grow with more useful agricultural features.
 - [ ] Secure backend email integration using Firebase Cloud Functions
 
 
+
+
 <p align="center">
   <b>🌾 Smart Farm Sheba — Smart Farming, Better Future.</b>
   <br>
