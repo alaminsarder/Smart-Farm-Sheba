@@ -1,10 +1,10 @@
-import 'dart:convert';
+import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-/// Wrapper screen so Dashboard can call IrrigationScreen()
 class IrrigationScreen extends StatelessWidget {
   const IrrigationScreen({super.key});
 
@@ -20,10 +20,8 @@ class IrrigationLogScreen extends StatefulWidget {
 }
 
 class _IrrigationLogScreenState extends State<IrrigationLogScreen> {
-  static const _storageKey = "irrigation_records_v1";
+  final _col = FirebaseFirestore.instance.collection('irrigation');
 
-  // Default crop suggestions.
-  // User can also add any custom crop.
   final List<String> crops = const [
     "Rice",
     "Wheat",
@@ -32,76 +30,68 @@ class _IrrigationLogScreenState extends State<IrrigationLogScreen> {
     "Jute",
   ];
 
+  final Set<String> _hidden = {};
+
+  StreamSubscription? _sub;
+
   List<IrrigationRecord> _records = [];
   String _filterCrop = "All";
   bool _loading = true;
+  bool _hasError = false;
+
+  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
 
   @override
   void initState() {
     super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_storageKey);
-
-      if (raw == null || raw.isEmpty) {
-        if (!mounted) return;
-
-        setState(() {
-          _records = [];
-          _loading = false;
-        });
-        return;
-      }
-
-      final decoded = jsonDecode(raw);
-      final list = (decoded as List).cast<dynamic>();
-
-      final items = list
-          .whereType<Map>()
-          .map(
-            (m) => IrrigationRecord.fromJson(
-              m.cast<String, dynamic>(),
-            ),
-          )
-          .toList()
-        ..sort(
-          (a, b) => b.dateTime.compareTo(a.dateTime),
-        );
-
-      if (!mounted) return;
-
-      setState(() {
-        _records = items;
-        _loading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _records = [];
-        _loading = false;
-      });
+    final uid = _uid;
+    if (uid == null) {
+      _loading = false;
+      return;
     }
+    _sub = _col.where('uid', isEqualTo: uid).snapshots().listen(
+      _onData,
+      onError: (_) {
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _hasError = true;
+        });
+      },
+    );
   }
 
-  Future<void> _save() async {
-    final prefs = await SharedPreferences.getInstance();
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
 
-    final list = _records.map((e) => e.toJson()).toList();
+  void _onData(QuerySnapshot snap) {
+    final items = <IrrigationRecord>[];
+    for (final d in snap.docs) {
+      if (_hidden.contains(d.id)) continue;
+      final r = IrrigationRecord.fromDoc(d.id, d.data());
+      if (r != null) items.add(r);
+    }
+    items.sort((a, b) => b.dateTime.compareTo(a.dateTime));
+    if (!mounted) return;
+    setState(() {
+      _records = items;
+      _loading = false;
+      _hasError = false;
+    });
+  }
 
-    await prefs.setString(
-      _storageKey,
-      jsonEncode(list),
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg)),
     );
   }
 
   List<IrrigationRecord> get _filtered {
     if (_filterCrop == "All") return _records;
-
     return _records.where((e) => e.crop == _filterCrop).toList();
   }
 
@@ -112,8 +102,88 @@ class _IrrigationLogScreenState extends State<IrrigationLogScreen> {
     );
   }
 
+  Future<void> _add(IrrigationRecord r) async {
+    final uid = _uid;
+    if (uid == null) {
+      _snack("Please log in first.");
+      return;
+    }
+    try {
+      await _col.add({
+        'uid': uid,
+        'crop': r.crop,
+        'dateTime': Timestamp.fromDate(r.dateTime),
+        'costTaka': r.costTaka,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }).timeout(const Duration(seconds: 10));
+    } on TimeoutException {
+      _snack("Saving is taking too long. Check your connection.");
+    } catch (_) {
+      _snack("Could not save the record. Check Firestore rules.");
+    }
+  }
+
+  Future<void> _delete(IrrigationRecord r) async {
+    try {
+      await _col.doc(r.id).delete();
+    } catch (_) {
+      _hidden.remove(r.id);
+      if (mounted) {
+        setState(() {
+          _records.add(r);
+          _records.sort((a, b) => b.dateTime.compareTo(a.dateTime));
+        });
+      }
+      _snack("Could not delete the record.");
+    }
+  }
+
+  Future<void> _clearAll() async {
+    final uid = _uid;
+    if (uid == null) return;
+    final old = List<IrrigationRecord>.from(_records);
+    for (final r in old) {
+      _hidden.add(r.id);
+    }
+    setState(() {
+      _records = [];
+    });
+    try {
+      final snap = await _col.where('uid', isEqualTo: uid).get();
+      final batch = FirebaseFirestore.instance.batch();
+      for (final d in snap.docs) {
+        batch.delete(d.reference);
+      }
+      await batch.commit();
+    } catch (_) {
+      for (final r in old) {
+        _hidden.remove(r.id);
+      }
+      if (mounted) {
+        setState(() {
+          _records = old;
+        });
+      }
+      _snack("Could not clear the records.");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_uid == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            "Irrigation Log",
+            style: TextStyle(fontWeight: FontWeight.w900),
+          ),
+          centerTitle: true,
+        ),
+        body: const Center(child: Text("Not signed in")),
+      );
+    }
+
     final df = DateFormat("dd MMM yyyy, hh:mm a");
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -156,7 +226,6 @@ class _IrrigationLogScreenState extends State<IrrigationLogScreen> {
           100,
         ),
         children: [
-          // Premium header
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -220,10 +289,7 @@ class _IrrigationLogScreenState extends State<IrrigationLogScreen> {
               ],
             ),
           ),
-
           const SizedBox(height: 18),
-
-          // Filter section
           const Text(
             "Filter by Crop",
             style: TextStyle(
@@ -231,9 +297,7 @@ class _IrrigationLogScreenState extends State<IrrigationLogScreen> {
               fontSize: 15,
             ),
           ),
-
           const SizedBox(height: 10),
-
           SizedBox(
             height: 42,
             child: ListView(
@@ -243,15 +307,12 @@ class _IrrigationLogScreenState extends State<IrrigationLogScreen> {
                   label: "All",
                   selected: _filterCrop == "All",
                 ),
-
                 ...crops.map(
                   (crop) => _buildFilterChip(
                     label: crop,
                     selected: _filterCrop == crop,
                   ),
                 ),
-
-                // Add custom crop filter automatically
                 ..._records
                     .map((e) => e.crop)
                     .where(
@@ -267,10 +328,7 @@ class _IrrigationLogScreenState extends State<IrrigationLogScreen> {
               ],
             ),
           ),
-
           const SizedBox(height: 16),
-
-          // Summary cards
           Row(
             children: [
               Expanded(
@@ -290,11 +348,36 @@ class _IrrigationLogScreenState extends State<IrrigationLogScreen> {
               ),
             ],
           ),
-
           const SizedBox(height: 18),
-
           if (_loading)
             const _LoadingBlock()
+          else if (_hasError)
+            const Padding(
+              padding: EdgeInsets.only(top: 55),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.cloud_off_rounded,
+                    size: 60,
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    "Could not load irrigation records.",
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(height: 5),
+                  Text(
+                    "Check your connection or Firestore rules.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            )
           else if (_filtered.isEmpty)
             const Padding(
               padding: EdgeInsets.only(top: 55),
@@ -383,14 +466,14 @@ class _IrrigationLogScreenState extends State<IrrigationLogScreen> {
           size: 28,
         ),
       ),
-      onDismissed: (_) async {
+      onDismissed: (_) {
+        _hidden.add(r.id);
         setState(() {
           _records.removeWhere(
             (e) => e.id == r.id,
           );
         });
-
-        await _save();
+        _delete(r);
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
@@ -414,7 +497,6 @@ class _IrrigationLogScreenState extends State<IrrigationLogScreen> {
             children: [
               Row(
                 children: [
-                  // Crop icon
                   Container(
                     height: 56,
                     width: 56,
@@ -433,10 +515,7 @@ class _IrrigationLogScreenState extends State<IrrigationLogScreen> {
                       size: 29,
                     ),
                   ),
-
                   const SizedBox(width: 14),
-
-                  // Crop name + date
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -501,10 +580,7 @@ class _IrrigationLogScreenState extends State<IrrigationLogScreen> {
                       ],
                     ),
                   ),
-
                   const SizedBox(width: 8),
-
-                  // Cost
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -530,10 +606,7 @@ class _IrrigationLogScreenState extends State<IrrigationLogScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 15),
-
-              // Bottom info bar
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -624,15 +697,7 @@ class _IrrigationLogScreenState extends State<IrrigationLogScreen> {
 
     if (saved == null) return;
 
-    setState(() {
-      _records.insert(0, saved);
-
-      _records.sort(
-        (a, b) => b.dateTime.compareTo(a.dateTime),
-      );
-    });
-
-    await _save();
+    await _add(saved);
   }
 
   Future<void> _confirmClearAll() async {
@@ -643,7 +708,7 @@ class _IrrigationLogScreenState extends State<IrrigationLogScreen> {
           "Clear all records?",
         ),
         content: const Text(
-          "সব irrigation record মুছে যাবে।",
+          "All your irrigation records will be deleted.",
         ),
         actions: [
           TextButton(
@@ -660,11 +725,7 @@ class _IrrigationLogScreenState extends State<IrrigationLogScreen> {
 
     if (ok != true) return;
 
-    setState(() {
-      _records = [];
-    });
-
-    await _save();
+    await _clearAll();
   }
 }
 
@@ -752,9 +813,7 @@ class _AddIrrigationSheetState extends State<_AddIrrigationSheet> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 18),
-
                 Row(
                   children: [
                     Container(
@@ -794,21 +853,16 @@ class _AddIrrigationSheetState extends State<_AddIrrigationSheet> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 20),
-
-                // Crop selector
                 const Text(
                   "Crop",
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-
                 const SizedBox(height: 8),
-
                 DropdownButtonFormField<String>(
-                  value: _customCrop ? null : _crop,
+                  value: _customCrop ? "__custom__" : _crop,
                   items: [
                     ...widget.crops.map(
                       (c) => DropdownMenuItem(
@@ -862,8 +916,6 @@ class _AddIrrigationSheetState extends State<_AddIrrigationSheet> {
                     ),
                   ),
                 ),
-
-                // Custom crop field
                 if (_customCrop) ...[
                   const SizedBox(height: 12),
                   TextFormField(
@@ -888,10 +940,7 @@ class _AddIrrigationSheetState extends State<_AddIrrigationSheet> {
                     },
                   ),
                 ],
-
                 const SizedBox(height: 14),
-
-                // Cost
                 TextFormField(
                   controller: _costCtrl,
                   keyboardType: const TextInputType.numberWithOptions(
@@ -921,10 +970,7 @@ class _AddIrrigationSheetState extends State<_AddIrrigationSheet> {
                     return null;
                   },
                 ),
-
                 const SizedBox(height: 14),
-
-                // Date & time
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
@@ -937,9 +983,7 @@ class _AddIrrigationSheetState extends State<_AddIrrigationSheet> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 18),
-
                 Row(
                   children: [
                     Expanded(
@@ -984,7 +1028,7 @@ class _AddIrrigationSheetState extends State<_AddIrrigationSheet> {
     }
 
     final record = IrrigationRecord(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: '',
       crop: cropName,
       dateTime: _dateTime,
       costTaka: _cost(),
@@ -1004,6 +1048,7 @@ class _AddIrrigationSheetState extends State<_AddIrrigationSheet> {
     );
 
     if (d == null) return;
+    if (!mounted) return;
 
     final t = await showTimePicker(
       context: context,
@@ -1037,23 +1082,27 @@ class IrrigationRecord {
     required this.costTaka,
   });
 
-  Map<String, dynamic> toJson() => {
-        "id": id,
-        "crop": crop,
-        "dateTime": dateTime.millisecondsSinceEpoch,
-        "costTaka": costTaka,
-      };
+  static IrrigationRecord? fromDoc(String id, Object? data) {
+    if (data is! Map) return null;
 
-  static IrrigationRecord fromJson(
-    Map<String, dynamic> j,
-  ) {
+    final rawDate = data['dateTime'];
+    DateTime when;
+    if (rawDate is Timestamp) {
+      when = rawDate.toDate();
+    } else if (rawDate is num) {
+      when = DateTime.fromMillisecondsSinceEpoch(rawDate.toInt());
+    } else {
+      when = DateTime.now();
+    }
+
+    final rawCost = data['costTaka'];
+    final cost = rawCost is num ? rawCost.toDouble() : 0.0;
+
     return IrrigationRecord(
-      id: (j["id"] ?? "").toString(),
-      crop: (j["crop"] ?? "").toString(),
-      dateTime: DateTime.fromMillisecondsSinceEpoch(
-        (j["dateTime"] as num).toInt(),
-      ),
-      costTaka: (j["costTaka"] as num).toDouble(),
+      id: id,
+      crop: (data['crop'] ?? '').toString(),
+      dateTime: when,
+      costTaka: cost,
     );
   }
 }
