@@ -37,17 +37,7 @@ Many farmers do not have a simple way to track their costs, keep farm notes, log
 - Screens query only `where('uid', isEqualTo: currentUser.uid)`, so a user only sees their own data.
 - Firestore Security Rules enforce this on the server (see [Firestore Rules](#firestore-rules)).
 
-## 📱 Screenshots
 
-> Add your app screenshots to a `screenshots/` folder and update the paths below.
-
-| Login | Dashboard | Expense |
-|:---:|:---:|:---:|
-| ![Login](screenshots/login.png) | ![Dashboard](screenshots/dashboard.png) | ![Expense](screenshots/expense.png) |
-
-| Irrigation | Notes | Profile |
-|:---:|:---:|:---:|
-| ![Irrigation](screenshots/irrigation.png) | ![Notes](screenshots/notes.png) | ![Profile](screenshots/profile.png) |
 
 ## 🛠️ Tech Stack
 
@@ -127,67 +117,13 @@ Smart-Farm-Sheba/
      ```
    - For Google Sign-In on Android, add your signing key's **SHA-1** in Firebase Project Settings
 
-4. **Set up EmailJS**
-   - Create an Email Service (Gmail) and an Email Template
-   - Set the template fields:
-
-     | Field | Value |
-     |---|---|
-     | To Email | `{{to_email}}` |
-     | From Name | `Smart Farm Sheba` |
-     | Subject | `{{subject}}` |
-
-   - The template body can use these variables: `{{heading}}`, `{{to_name}}`, `{{message}}`, `{{box_title}}`, `{{box_text}}`, `{{footer_note}}`
-   - Put your IDs in `lib/services/email_service.dart`:
-     ```dart
-     static const String _serviceId = 'YOUR_SERVICE_ID';
-     static const String _templateId = 'YOUR_TEMPLATE_ID';
-     static const String _publicKey = 'YOUR_PUBLIC_KEY';
-     ```
-   - For the Android app, enable **Allow EmailJS API for non-browser applications** in EmailJS → Account → Security
-   - Restrict allowed domains in EmailJS Security to protect your monthly quota
 
 5. **Run the app**
    ```bash
    flutter run
    ```
 
-### Firestore Rules
 
-Use these rules so each user can read and write only their own data:
-
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-
-    match /expenses/{docId} {
-      allow read, update, delete: if request.auth != null
-        && resource.data.uid == request.auth.uid;
-      allow create: if request.auth != null
-        && request.resource.data.uid == request.auth.uid;
-    }
-
-    match /notes/{docId} {
-      allow read, update, delete: if request.auth != null
-        && resource.data.uid == request.auth.uid;
-      allow create: if request.auth != null
-        && request.resource.data.uid == request.auth.uid;
-    }
-
-    match /irrigation/{docId} {
-      allow read, update, delete: if request.auth != null
-        && resource.data.uid == request.auth.uid;
-      allow create: if request.auth != null
-        && request.resource.data.uid == request.auth.uid;
-    }
-  }
-}
-```
 
 ### Data Model
 
