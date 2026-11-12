@@ -326,20 +326,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
             const SizedBox(height: 22),
             const AuthDivider(text: 'or register with'),
             const SizedBox(height: 18),
-            AuthSocialButton(
-              icon: _loadingGoogle
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(
-                      Icons.g_mobiledata_rounded,
-                      size: 28,
-                      color: Color(0xFFDB4437),
-                    ),
-              label: 'Google',
-              onTap: busy ? null : _registerWithGoogle,
+            Center(
+              child: SizedBox(
+                width: 190,
+                height: 44,
+                child: AuthSocialButton(
+                  icon: _loadingGoogle
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(
+                          Icons.g_mobiledata_rounded,
+                          size: 24,
+                          color: Color(0xFFDB4437),
+                        ),
+                  label: 'Google',
+                  onTap: busy ? null : _registerWithGoogle,
+                ),
+              ),
             ),
             const SizedBox(height: 22),
             Center(

@@ -13,28 +13,21 @@ dependencies:
 
   cupertino_icons: ^1.0.8
 
-  # ✅ State Management
   provider: ^6.1.2
 
-  # ✅ Firebase Services
   firebase_core: ^3.6.0
   firebase_auth: ^5.3.1
   cloud_firestore: ^5.4.4
   firebase_storage: ^12.3.2
 
-  # ✅ Google Sign-In
   google_sign_in: ^6.2.1
 
-  # ✅ Date & Time
   intl: ^0.19.0
 
-  # ✅ HTTP
   http: ^1.6.0
 
-  # ✅ Auto login remember
   shared_preferences: ^2.3.2
 
-  # ✅ ENV loader (for OpenWeather key)
   flutter_dotenv: ^5.2.0
 
 dev_dependencies:
@@ -43,7 +36,17 @@ dev_dependencies:
 
   flutter_lints: ^5.0.0
 
+  flutter_launcher_icons: ^0.14.1
+
 flutter:
   uses-material-design: true
   assets:
     - .env
+    - assets/images/
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/logo.png"
+  adaptive_icon_background: "#0E5C3A"
+  adaptive_icon_foreground: "assets/images/logo.png"

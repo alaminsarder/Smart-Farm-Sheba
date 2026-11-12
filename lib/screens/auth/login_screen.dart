@@ -6,7 +6,6 @@ import 'package:smart_farm_sheba/services/google_auth_service.dart';
 import 'package:smart_farm_sheba/features/home/presentation/home_screen.dart';
 import 'package:smart_farm_sheba/screens/auth/auth_widgets.dart';
 import 'package:smart_farm_sheba/screens/auth/forgot_password_screen.dart';
-import 'package:smart_farm_sheba/screens/auth/phone_login_screen.dart';
 import 'package:smart_farm_sheba/screens/auth/register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -118,7 +117,6 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       setState(() => _loadingGoogle = false);
       if (user != null) {
-        _sendLoginMail();
         _goHome();
       } else {
         _snack("Google sign in cancelled");
@@ -224,37 +222,26 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 22),
             const AuthDivider(text: 'or continue with'),
             const SizedBox(height: 18),
-            AuthSocialButton(
-              icon: _loadingGoogle
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(
-                      Icons.g_mobiledata_rounded,
-                      size: 28,
-                      color: Color(0xFFDB4437),
-                    ),
-              label: 'Google',
-              onTap: busy ? null : _loginWithGoogle,
-            ),
-            const SizedBox(height: 12),
-            AuthSocialButton(
-              icon: const Icon(
-                Icons.phone_rounded,
-                size: 22,
-                color: AuthPalette.emerald,
-              ),
-              label: 'Phone number',
-              onTap: busy
-                  ? null
-                  : () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const PhoneLoginScreen(),
+            Center(
+              child: SizedBox(
+                width: 190,
+                height: 44,
+                child: AuthSocialButton(
+                  icon: _loadingGoogle
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(
+                          Icons.g_mobiledata_rounded,
+                          size: 24,
+                          color: Color(0xFFDB4437),
                         ),
-                      ),
+                  label: 'Google',
+                  onTap: busy ? null : _loginWithGoogle,
+                ),
+              ),
             ),
             const SizedBox(height: 22),
             Center(

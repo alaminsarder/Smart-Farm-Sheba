@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:smart_farm_sheba/features/dashboard/presentation/dashboard_screen.dart';
-import 'package:smart_farm_sheba/features/weather/presentation/weather_screen.dart';
+import 'package:smart_farm_sheba/features/notes/presentation/notes_screen.dart';
 import 'package:smart_farm_sheba/features/expense/presentation/expense_screen.dart';
 import 'package:smart_farm_sheba/features/profile/presentation/profile_screen.dart';
 
@@ -19,9 +19,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   late final List<Widget> _pages = [
     const DashboardScreen(),
-    WeatherScreen(), // const না থাকলে safe
-    ExpenseScreen(), // const না থাকলে safe
-    ProfileScreen(), // const না থাকলে safe
+    NotesScreen(),
+    ExpenseScreen(),
+    ProfileScreen(),
   ];
 
   void _onDestinationSelected(int index) {
@@ -44,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: _onDestinationSelected,
-        indicatorColor: colorScheme.primary.withOpacity(0.12),
+        indicatorColor: colorScheme.primary.withAlpha(30),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
@@ -52,9 +52,9 @@ class _HomeScreenState extends State<HomeScreen> {
             label: "Home",
           ),
           NavigationDestination(
-            icon: Icon(Icons.cloud_outlined),
-            selectedIcon: Icon(Icons.cloud_rounded),
-            label: "Weather",
+            icon: Icon(Icons.note_alt_outlined),
+            selectedIcon: Icon(Icons.note_alt_rounded),
+            label: "Notes",
           ),
           NavigationDestination(
             icon: Icon(Icons.calculate_outlined),

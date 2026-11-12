@@ -1,10 +1,10 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-
-// ======================================================================
-// THEME + CATEGORIES
-// ======================================================================
 
 const _ink = Color(0xFF1B1F23);
 const _bg = Color(0xFFF4F7F4);
@@ -33,9 +33,10 @@ const _categories = <_Category>[
 
 enum _Filter { all, profitable, loss }
 
-// ======================================================================
-// MODEL
-// ======================================================================
+double _toDouble(dynamic v) {
+  if (v is num) return v.toDouble();
+  return double.tryParse('$v') ?? 0.0;
+}
 
 class _FinanceRecord {
   final String id;
@@ -54,12 +55,37 @@ class _FinanceRecord {
     required this.date,
   });
 
+  factory _FinanceRecord.fromDoc(String id, Map data) {
+    final rawDate = data['date'];
+    DateTime date;
+    if (rawDate is Timestamp) {
+      date = rawDate.toDate();
+    } else if (rawDate is num) {
+      date = DateTime.fromMillisecondsSinceEpoch(rawDate.toInt());
+    } else {
+      date = DateTime.now();
+    }
+
+    final rawCat = data['category'];
+    final cat = rawCat is num ? rawCat.toInt() : 0;
+    final safeCat = cat < 0
+        ? 0
+        : cat > _categories.length - 1
+            ? _categories.length - 1
+            : cat;
+
+    return _FinanceRecord(
+      id: id,
+      title: (data['title'] ?? '').toString(),
+      category: safeCat,
+      cost: _toDouble(data['cost']),
+      profit: _toDouble(data['profit']),
+      date: date,
+    );
+  }
+
   double get net => profit - cost;
 }
-
-// ======================================================================
-// SCREEN
-// ======================================================================
 
 class ExpenseScreen extends StatefulWidget {
   const ExpenseScreen({super.key});
@@ -74,17 +100,93 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   final _dateFmt = DateFormat('dd MMM yyyy');
   final _monthFmt = DateFormat('MMMM yyyy');
 
-  final List<_FinanceRecord> _records = [];
+  final _col = FirebaseFirestore.instance.collection('expenses');
+
+  StreamSubscription? _sub;
+  List _all = [];
+  final Set _hidden = {};
+  bool _loading = true;
+  String? _error;
   _Filter _filter = _Filter.all;
 
-  double get _totalCost => _records.fold(0.0, (s, r) => s + r.cost);
-  double get _totalProfit => _records.fold(0.0, (s, r) => s + r.profit);
+  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
+
+  List get _records => _all.where((r) => !_hidden.contains(r.id)).toList();
+
+  double get _totalCost =>
+      _records.fold(0.0, (s, r) => s + (r as _FinanceRecord).cost);
+  double get _totalProfit =>
+      _records.fold(0.0, (s, r) => s + (r as _FinanceRecord).profit);
   double get _net => _totalProfit - _totalCost;
 
   String _signed(double v) => "${v >= 0 ? '+' : '−'} ${_money.format(v.abs())}";
 
-  List<_FinanceRecord> get _visible {
-    final list = _records.where((r) {
+  @override
+  void initState() {
+    super.initState();
+    _listen();
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  void _listen() {
+    _sub?.cancel();
+    final uid = _uid;
+    if (uid == null) {
+      _loading = false;
+      _error = 'Please log in again.';
+      return;
+    }
+    _loading = true;
+    _error = null;
+    _sub = _col.where('uid', isEqualTo: uid).snapshots().listen(
+      (snap) {
+        final list = [];
+        final Set ids = {};
+        for (final d in snap.docs) {
+          ids.add(d.id);
+          list.add(_FinanceRecord.fromDoc(d.id, d.data()));
+        }
+        _hidden.removeWhere((id) => !ids.contains(id));
+        if (!mounted) return;
+        setState(() {
+          _all = list;
+          _loading = false;
+          _error = null;
+        });
+      },
+      onError: (e) {
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _error = '$e';
+        });
+      },
+    );
+  }
+
+  Map<String, dynamic> _payload(_FinanceRecord r, String uid,
+      {required bool isNew}) {
+    final map = <String, dynamic>{
+      'uid': uid,
+      'title': r.title,
+      'category': r.category,
+      'cost': r.cost,
+      'profit': r.profit,
+      'date': Timestamp.fromDate(r.date),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    if (isNew) map['createdAt'] = FieldValue.serverTimestamp();
+    return map;
+  }
+
+  List get _visible {
+    final list = _records.where((x) {
+      final r = x as _FinanceRecord;
       switch (_filter) {
         case _Filter.all:
           return true;
@@ -94,7 +196,8 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
           return r.net < 0;
       }
     }).toList();
-    list.sort((a, b) => b.date.compareTo(a.date));
+    list.sort((a, b) =>
+        (b as _FinanceRecord).date.compareTo((a as _FinanceRecord).date));
     return list;
   }
 
@@ -116,6 +219,12 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   }
 
   Future<void> _openSheet({_FinanceRecord? record}) async {
+    final uid = _uid;
+    if (uid == null) {
+      _toast('Please log in again.');
+      return;
+    }
+
     final result = await showModalBottomSheet<_FinanceRecord>(
       context: context,
       isScrollControlled: true,
@@ -125,39 +234,60 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
 
     if (!mounted || result == null) return;
 
-    setState(() {
+    try {
       if (record != null) {
-        final i = _records.indexWhere((r) => r.id == record.id);
-        if (i >= 0) _records[i] = result;
+        await _col
+            .doc(record.id)
+            .update(_payload(result, uid, isNew: false))
+            .timeout(const Duration(seconds: 10));
       } else {
-        _records.insert(0, result);
+        await _col
+            .add(_payload(result, uid, isNew: true))
+            .timeout(const Duration(seconds: 10));
       }
-    });
-
-    _toast(record != null ? 'Record updated' : 'Record added');
+      _toast(record != null ? 'Record updated' : 'Record added');
+    } on TimeoutException {
+      _toast('Could not confirm save. Check your internet.');
+    } catch (e) {
+      _toast('Save failed: $e');
+    }
   }
 
-  void _delete(_FinanceRecord record) {
-    final index = _records.indexWhere((r) => r.id == record.id);
-    if (index < 0) return;
+  Future<void> _delete(_FinanceRecord record) async {
+    final uid = _uid;
+    if (uid == null) return;
 
-    setState(() => _records.removeAt(index));
+    setState(() => _hidden.add(record.id));
     HapticFeedback.mediumImpact();
+
+    try {
+      await _col.doc(record.id).delete().timeout(const Duration(seconds: 10));
+    } catch (e) {
+      if (mounted) setState(() => _hidden.remove(record.id));
+      _toast('Delete failed: $e');
+      return;
+    }
 
     _toast(
       'Deleted “${record.title}”',
       action: SnackBarAction(
         label: 'UNDO',
         textColor: const Color(0xFF86EFAC),
-        onPressed: () => setState(() => _records.insert(index, record)),
+        onPressed: () async {
+          try {
+            await _col.doc(record.id).set(_payload(record, uid, isNew: true));
+            if (mounted) setState(() => _hidden.remove(record.id));
+          } catch (e) {
+            _toast('Undo failed: $e');
+          }
+        },
       ),
     );
   }
 
-  // ---------------------------------------------------------------- UI
-
   @override
   Widget build(BuildContext context) {
+    final records = _records;
     final list = _visible;
 
     return Scaffold(
@@ -175,9 +305,21 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          SliverToBoxAdapter(child: _header()),
+          SliverToBoxAdapter(child: _header(records)),
           SliverToBoxAdapter(child: _filters()),
-          if (_records.isEmpty)
+          if (_loading)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 90),
+                  child: CircularProgressIndicator(color: _mid),
+                ),
+              ),
+            )
+          else if (_error != null)
+            SliverFillRemaining(hasScrollBody: false, child: _errorState())
+          else if (records.isEmpty)
             SliverFillRemaining(hasScrollBody: false, child: _emptyState())
           else if (list.isEmpty)
             SliverFillRemaining(hasScrollBody: false, child: _noResults())
@@ -193,15 +335,19 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
     );
   }
 
-  List<Widget> _groupedChildren(List<_FinanceRecord> list) {
-    final groups = <String, List<_FinanceRecord>>{};
-    for (final r in list) {
-      groups.putIfAbsent(_monthFmt.format(r.date), () => []).add(r);
-    }
-
+  List<Widget> _groupedChildren(List list) {
     final children = <Widget>[];
-    groups.forEach((month, items) {
-      final monthNet = items.fold(0.0, (s, r) => s + r.net);
+    int i = 0;
+    while (i < list.length) {
+      final first = list[i] as _FinanceRecord;
+      final month = _monthFmt.format(first.date);
+      int j = i;
+      double monthNet = 0;
+      while (j < list.length &&
+          _monthFmt.format((list[j] as _FinanceRecord).date) == month) {
+        monthNet += (list[j] as _FinanceRecord).net;
+        j++;
+      }
 
       children.add(
         Padding(
@@ -233,7 +379,8 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
         ),
       );
 
-      for (final r in items) {
+      for (int k = i; k < j; k++) {
+        final r = list[k] as _FinanceRecord;
         children.add(
           _RecordCard(
             key: ValueKey(r.id),
@@ -246,11 +393,12 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
           ),
         );
       }
-    });
+      i = j;
+    }
     return children;
   }
 
-  Widget _header() {
+  Widget _header(List records) {
     final net = _net;
     final total = _totalCost + _totalProfit;
     final costFlex = total == 0 ? 1 : (_totalCost / total * 1000).round();
@@ -359,7 +507,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                 ),
                 const SizedBox(width: 5),
                 Text(
-                  _records.isEmpty
+                  records.isEmpty
                       ? 'No records yet'
                       : net >= 0
                           ? 'You are in profit'
@@ -533,6 +681,45 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
     );
   }
 
+  Widget _errorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(32, 0, 32, 90),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_rounded,
+                size: 54, color: Colors.black.withOpacity(.3)),
+            const SizedBox(height: 14),
+            const Text('Could not load records',
+                style: TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.w800, color: _ink)),
+            const SizedBox(height: 6),
+            Text(
+              _error ?? '',
+              textAlign: TextAlign.center,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.black.withOpacity(.55)),
+            ),
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: _mid,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: () => setState(_listen),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try again',
+                  style: TextStyle(fontWeight: FontWeight.w800)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _emptyState() {
     return Center(
       child: Padding(
@@ -625,10 +812,6 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
     );
   }
 }
-
-// ======================================================================
-// RECORD CARD
-// ======================================================================
 
 class _RecordCard extends StatelessWidget {
   final _FinanceRecord record;
@@ -873,10 +1056,6 @@ class _RecordCard extends StatelessWidget {
   }
 }
 
-// ======================================================================
-// FORM SHEET
-// ======================================================================
-
 class _FinanceFormSheet extends StatefulWidget {
   final _FinanceRecord? record;
   final DateFormat dateFmt;
@@ -905,7 +1084,8 @@ class _FinanceFormSheetState extends State<_FinanceFormSheet> {
     final r = widget.record;
     _titleC = TextEditingController(text: r?.title ?? '');
     _costC = TextEditingController(text: r == null ? '' : _plain(r.cost));
-    _profitC = TextEditingController(text: r == null ? '' : _plain(r.profit));
+    _profitC = TextEditingController(
+        text: r == null || r.profit == 0 ? '' : _plain(r.profit));
     _date = r?.date ?? DateTime.now();
     _category = r?.category ?? 0;
   }
@@ -949,7 +1129,7 @@ class _FinanceFormSheetState extends State<_FinanceFormSheet> {
 
     Navigator.of(context).pop(
       _FinanceRecord(
-        id: widget.record?.id ?? '${DateTime.now().microsecondsSinceEpoch}',
+        id: widget.record?.id ?? '',
         title: _titleC.text.trim(),
         category: _category,
         cost: _costVal,
@@ -985,9 +1165,9 @@ class _FinanceFormSheetState extends State<_FinanceFormSheet> {
         LengthLimitingTextInputFormatter(12),
       ];
 
-  String? _amountValidator(String? v, String name) {
+  String? _amountValidator(String? v, String name, {bool optional = false}) {
     final t = (v ?? '').trim();
-    if (t.isEmpty) return '$name required';
+    if (t.isEmpty) return optional ? null : '$name required';
     final n = double.tryParse(t);
     if (n == null || n < 0) return 'Enter valid $name';
     return null;
@@ -1053,8 +1233,6 @@ class _FinanceFormSheetState extends State<_FinanceFormSheet> {
                     ],
                   ),
                   const SizedBox(height: 20),
-
-                  // Category
                   const Text('Category',
                       style: TextStyle(
                           fontSize: 13,
@@ -1102,7 +1280,6 @@ class _FinanceFormSheetState extends State<_FinanceFormSheet> {
                     }),
                   ),
                   const SizedBox(height: 18),
-
                   TextFormField(
                     controller: _titleC,
                     textInputAction: TextInputAction.next,
@@ -1116,7 +1293,6 @@ class _FinanceFormSheetState extends State<_FinanceFormSheet> {
                     },
                   ),
                   const SizedBox(height: 14),
-
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1144,14 +1320,13 @@ class _FinanceFormSheetState extends State<_FinanceFormSheet> {
                           onChanged: (_) => setState(() {}),
                           decoration: _deco('Profit', Icons.north_east_rounded,
                               prefix: '৳ '),
-                          validator: (v) => _amountValidator(v, 'profit'),
+                          validator: (v) =>
+                              _amountValidator(v, 'profit', optional: true),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 14),
-
-                  // Date
                   InkWell(
                     onTap: _pickDate,
                     borderRadius: BorderRadius.circular(14),
@@ -1182,8 +1357,6 @@ class _FinanceFormSheetState extends State<_FinanceFormSheet> {
                     ),
                   ),
                   const SizedBox(height: 16),
-
-                  // Live net preview
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(
@@ -1223,7 +1396,6 @@ class _FinanceFormSheetState extends State<_FinanceFormSheet> {
                     ),
                   ),
                   const SizedBox(height: 22),
-
                   Row(
                     children: [
                       Expanded(
