@@ -231,3 +231,9 @@ The project will continue to grow with more useful agricultural features.
   <br><br>
   ⭐ If you find this project useful, don't forget to give it a star!
 </p>
+
+
+## License
+
+This project is licensed under the MIT License.
+See the [LICENSE](LICENSE) file for details.
